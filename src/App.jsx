@@ -384,17 +384,19 @@ function AuthScreen() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const loginWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        // This ensures they go back to your site after logging in
-        redirectTo: window.location.origin 
-      }
-    });
-    if (error) setErr(error.message);
-  };
-
+const loginWithGoogle = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      queryParams: {
+        prompt: 'select_account', // This forces the account selection screen
+        access_type: 'offline',
+      },
+      redirectTo: window.location.origin 
+    }
+  });
+  if (error) setErr(error.message);
+};
   const loginWithEmail = async () => {
     if (!email.trim()) return;
     setBusy(true); setErr("");
