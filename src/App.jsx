@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
 
+// Deploying to Squad 1
 // ─────────────────────────────────────────────
 // CONSTANTS & HELPERS
 // ─────────────────────────────────────────────
