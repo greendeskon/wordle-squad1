@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
-
+import { Sword, ClipboardCheck, History, User } from "lucide-react";
 // Deploying to Squad 1
 // ─────────────────────────────────────────────
 // CONSTANTS & HELPERS
@@ -105,8 +105,24 @@ const css = `
   .ph p{color:${C.muted2};font-size:0.8rem;margin-top:5px}
   .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:${C.surface};border-top:1px solid ${C.border};display:flex;z-index:200}
   .ni{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 13px;border:none;background:transparent;color:${C.muted};cursor:pointer;font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:0.08em;gap:3px;transition:color 0.15s}
-  .ni .ic{font-size:1.2rem;line-height:1}
-  .ni.on{color:${C.accent}}
+.ni .ic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  margin-bottom: 2px;
+  transition: transform 0.2s ease;
+}
+
+/* This makes the icon pop slightly when active */
+.ni.on .ic {
+  transform: scale(1.1);
+  color: ${C.accent};
+}
+
+.ni svg {
+  stroke-width: 2.5px; /* Makes icons look better on high-res mobile screens */
+}  .ni.on{color:${C.accent}}
   .card{background:${C.surface};border:1px solid ${C.border};border-radius:16px;padding:20px;margin:0 16px 12px}
   .ct{font-size:0.66rem;font-weight:700;letter-spacing:0.12em;color:${C.muted2};text-transform:uppercase;margin-bottom:13px;font-family:'Space Mono',monospace}
   .inp{width:100%;background:${C.bg};border:1px solid ${C.border};border-radius:10px;color:${C.text};font-family:'Syne',sans-serif;font-size:0.88rem;padding:12px 14px;outline:none;transition:border-color 0.2s}
@@ -173,13 +189,48 @@ const css = `
 // ─────────────────────────────────────────────
 
 export default function App() {
-  const [tab, setTab]               = useState("log");
+const [tab, setTab] = useState(() => {
+  return localStorage.getItem("wordle_last_tab") || "arenas";
+});
+
+// 2. Save tab whenever it changes
+useEffect(() => {
+  localStorage.setItem("wordle_last_tab", tab);
+}, [tab]);
   const [session, setSession]       = useState(null);
   const [profile, setProfile]       = useState(null); // { id, username }
   const [myLogs, setMyLogs]         = useState([]);   // rows from `logs` table
   const [loading, setLoading]       = useState(true);
   const [arenaView, setArenaView]   = useState("list");
   const [currentArena, setCurrentArena] = useState(null);
+
+
+const handleSignOut = async () => {
+  await supabase.auth.signOut();
+  localStorage.removeItem("wordle_last_tab"); // Reset to default for next login
+  window.location.reload(); // Hard refresh to clear all states
+};
+
+useEffect(() => {
+  // If we are in an arena and the user hits 'Back' on their phone
+  const handlePhysicalBack = (e) => {
+    if (tab === "arenas" && arenaView === "group") {
+      e.preventDefault();
+      setArenaView("list");
+      setCurrentArena(null);
+    }
+  };
+
+  window.addEventListener("popstate", handlePhysicalBack);
+  
+  // Push a fake state so there is something to "go back" from
+  if (arenaView === "group") {
+    window.history.pushState({ viewingArena: true }, "");
+  }
+
+  return () => window.removeEventListener("popstate", handlePhysicalBack);
+}, [arenaView, tab]);
+
 
   // ── Auth listener ──
   useEffect(() => {
@@ -271,26 +322,48 @@ export default function App() {
           />
         )}
         {tab === "history" && (
-          <HistoryView myLogs={myLogs} streak={streak} />
-        )}
+  <HistoryView 
+    myLogs={myLogs} 
+    streak={streak} 
+    onSignOut={handleSignOut} 
+  />
+)}
       </div>
 
       <nav className="bnav">
-        {[
-          { key:"arenas",  icon:"⚔️",             label:"ARENAS"  },
-          { key:"log",     icon:todayLog?"✅":"📝", label:"THE LOG" },
-          { key:"history", icon:"📊",              label:"HISTORY" },
-        ].map(n => (
-          <button key={n.key} className={`ni ${tab===n.key?"on":""}`}
-            onClick={() => {
-              setTab(n.key);
-              if (n.key === "arenas") { setArenaView("list"); setCurrentArena(null); }
-            }}>
-            <span className="ic">{n.icon}</span>
-            <span>{n.label}</span>
-          </button>
-        ))}
-      </nav>
+  {[
+    { 
+      key: "arenas", 
+      icon: <Sword size={20} />, 
+      label: "ARENAS" 
+    },
+    { 
+      key: "log", 
+      icon: <ClipboardCheck size={20} color={todayLog ? C.accent : "currentColor"} />, 
+      label: "THE LOG" 
+    },
+    { 
+      key: "history", 
+      icon: <History size={20} />, 
+      label: "HISTORY" 
+    },
+  ].map(n => (
+    <button 
+      key={n.key} 
+      className={`ni ${tab === n.key ? "on" : ""}`}
+      onClick={() => {
+        setTab(n.key);
+        if (n.key === "arenas") { 
+          setArenaView("list"); 
+          setCurrentArena(null); 
+        }
+      }}
+    >
+      <span className="ic">{n.icon}</span>
+      <span>{n.label}</span>
+    </button>
+  ))}
+</nav>
     </>
   );
 }
@@ -840,32 +913,41 @@ function ArenaGroupView({ arenaId, profile, onBack }) {
 // HISTORY VIEW
 // ─────────────────────────────────────────────
 
-function HistoryView({ myLogs, streak }) {
-  const sorted  = [...myLogs].sort((a,b) => b.puzzle_no - a.puzzle_no);
+function HistoryView({ myLogs, streak, onSignOut }) {
+  const sorted  = [...myLogs].sort((a, b) => b.puzzle_no - a.puzzle_no);
   const wins    = myLogs.filter(e => !e.failed);
-  const winRate = myLogs.length ? Math.round((wins.length/myLogs.length)*100) : null;
-  const avg     = wins.length ? (wins.reduce((a,b)=>a+b.score,0)/wins.length).toFixed(2) : null;
-  const best    = wins.length ? Math.min(...wins.map(e=>e.score)) : null;
+  const winRate = myLogs.length ? Math.round((wins.length / myLogs.length) * 100) : null;
+  const avg     = wins.length ? (wins.reduce((a, b) => a + b.score, 0) / wins.length).toFixed(2) : null;
+  const best    = wins.length ? Math.min(...wins.map(e => e.score)) : null;
 
   return (
     <div>
-      <div className="ph"><h1>HISTORY</h1><p>{myLogs.length} games played</p></div>
+      <div className="ph" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1>HISTORY</h1>
+          <p>{myLogs.length} games played</p>
+        </div>
+        {/* Sign Out Icon Button */}
+        <button onClick={onSignOut} className="btn ghost bsm" style={{ width: 'auto', borderColor: C.border }}>
+          <LogOut size={16} color={C.red} />
+        </button>
+      </div>
 
       <div className="sgrid">
         <div className="scard">
-          <div className="sv" style={{color:C.orange}}>{streak>0?`🔥${streak}`:"0"}</div>
+          <div className="sv" style={{ color: C.orange }}>{streak > 0 ? `🔥${streak}` : "0"}</div>
           <div className="sl">Current Streak</div>
         </div>
         <div className="scard">
-          <div className="sv">{winRate!==null?`${winRate}%`:"—"}</div>
+          <div className="sv">{winRate !== null ? `${winRate}%` : "—"}</div>
           <div className="sl">Win Rate</div>
         </div>
         <div className="scard">
-          <div className="sv">{avg??"—"}</div>
+          <div className="sv">{avg ?? "—"}</div>
           <div className="sl">Avg Score</div>
         </div>
         <div className="scard">
-          <div className="sv">{best?`${best}/6`:"—"}</div>
+          <div className="sv">{best ? `${best}/6` : "—"}</div>
           <div className="sl">Personal Best</div>
         </div>
       </div>
@@ -874,19 +956,33 @@ function HistoryView({ myLogs, streak }) {
         <div className="ct">GAME LOG</div>
         {!sorted.length ? (
           <div className="empty">No games yet — submit today's Wordle!</div>
-        ) : sorted.map((e,i) => {
-          const barPct   = e.failed ? 100 : Math.round((e.score/6)*100);
-          const barColor = e.failed ? C.red : e.score<=2 ? C.accent : e.score<=4 ? C.yellow : C.orange;
-          const date     = new Date(e.submitted_at).toLocaleDateString("en-US",{month:"short",day:"numeric"});
-          return (
-            <div key={i} className="hr">
-              <span className="hp">#{e.puzzle_no}</span>
-              <span className="hs" style={{color:e.failed?C.red:C.accent}}>{e.failed?"X/6":`${e.score}/6`}</span>
-              <div className="hbw"><div className="hb" style={{width:`${barPct}%`,background:barColor}}/></div>
-              <span className="hd">{date}</span>
-            </div>
-          );
-        })}
+        ) : (
+          sorted.map((e, i) => {
+            const barPct = e.failed ? 100 : Math.round((e.score / 6) * 100);
+            const barColor = e.failed ? C.red : e.score <= 3 ? C.accent : C.yellow;
+            const date = new Date(e.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            
+            return (
+              <div key={i} className="hr">
+                <span className="hp">#{e.puzzle_no}</span>
+                <span className="hs" style={{ color: e.failed ? C.red : C.accent }}>
+                  {e.failed ? "X/6" : `${e.score}/6`}
+                </span>
+                <div className="hbw">
+                  <div className="hb" style={{ width: `${barPct}%`, background: barColor }} />
+                </div>
+                <span className="hd">{date}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Large Sign Out Button at Bottom for accessibility */}
+      <div style={{ padding: "0 16px 40px" }}>
+        <button className="btn ghost" style={{ color: C.red, borderColor: C.border }} onClick={onSignOut}>
+          Log Out
+        </button>
       </div>
     </div>
   );
