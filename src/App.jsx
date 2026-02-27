@@ -300,11 +300,22 @@ export default function App() {
 
 function AuthScreen() {
   const [email, setEmail] = useState("");
-  const [sent, setSent]   = useState(false);
-  const [err, setErr]     = useState("");
-  const [busy, setBusy]   = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const send = async () => {
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // This ensures they go back to your site after logging in
+        redirectTo: window.location.origin 
+      }
+    });
+    if (error) setErr(error.message);
+  };
+
+  const loginWithEmail = async () => {
     if (!email.trim()) return;
     setBusy(true); setErr("");
     const { error } = await supabase.auth.signInWithOtp({
@@ -319,33 +330,38 @@ function AuthScreen() {
   return (
     <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",minHeight:"100vh",padding:"0 24px",maxWidth:520,margin:"0 auto" }}>
       <div style={{ textAlign:"center",marginBottom:32 }}>
-        <div style={{ fontFamily:"'Space Mono',monospace",fontSize:"0.68rem",color:C.muted2,letterSpacing:"0.2em",marginBottom:8 }}>WELCOME TO</div>
         <h1 style={{ fontFamily:"'Syne',sans-serif",fontSize:"3.2rem",fontWeight:800,letterSpacing:"-2px",lineHeight:1 }}>
           WORDLE<br/><span style={{ color:C.accent }}>SQUAD</span>
         </h1>
       </div>
 
-      {sent ? (
-        <div className="card" style={{ margin:0,textAlign:"center" }}>
-          <div style={{ fontSize:"2rem",marginBottom:12 }}>📬</div>
-          <div style={{ fontWeight:700,marginBottom:6 }}>Check your email</div>
-          <div style={{ color:C.muted2,fontSize:"0.82rem" }}>
-            We sent a magic link to <strong style={{color:C.text}}>{email}</strong>.<br/>Click it to sign in.
+      <div className="card" style={{ margin:0 }}>
+        <button className="btn" onClick={loginWithGoogle} style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <img src="https://www.google.com/favicon.ico" width="16" alt="G" />
+          Continue with Google
+        </button>
+
+        <div style={{ display:'flex', alignItems:'center', margin:'10px 0 20px', gap:10, opacity:0.3 }}>
+          <div style={{ flex:1, height:1, background:C.text }}></div>
+          <span style={{ fontSize:10, fontFamily:'Space Mono' }}>OR</span>
+          <div style={{ flex:1, height:1, background:C.text }}></div>
+        </div>
+
+        {sent ? (
+          <div style={{ textAlign:"center" }}>
+            <div style={{ color:C.accent, fontSize:"0.82rem" }}>Check your email for the magic link!</div>
           </div>
-        </div>
-      ) : (
-        <div className="card" style={{ margin:0 }}>
-          <div className="ct">SIGN IN / SIGN UP</div>
-          <p style={{ color:C.muted2,fontSize:"0.8rem",marginBottom:14 }}>Enter your email — we'll send a magic link. No password needed.</p>
-          <input className="inp" style={{ marginBottom:12 }} type="email" placeholder="your@email.com"
-            value={email} onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key==="Enter" && send()} />
-          <button className="btn" disabled={busy || !email.trim()} onClick={send}>
-            {busy ? "SENDING…" : "SEND MAGIC LINK →"}
-          </button>
-          {err && <div className="merr">{err}</div>}
-        </div>
-      )}
+        ) : (
+          <>
+            <input className="inp" style={{ marginBottom:12 }} type="email" placeholder="Email (Backup)..."
+              value={email} onChange={e => setEmail(e.target.value)} />
+            <button className="btn ghost" disabled={busy} onClick={loginWithEmail}>
+              {busy ? "SENDING..." : "Email Magic Link"}
+            </button>
+          </>
+        )}
+        {err && <div className="merr">{err}</div>}
+      </div>
     </div>
   );
 }
