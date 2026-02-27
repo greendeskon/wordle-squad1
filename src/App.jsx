@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
-import { Sword, ClipboardCheck, History, User } from "lucide-react";
+import { Sword, ClipboardCheck, History, LogOut } from "lucide-react"; 
+// Remove 'User' if you aren't using it, but definitely add 'LogOut'
 // Deploying to Squad 1
 // ─────────────────────────────────────────────
 // CONSTANTS & HELPERS
@@ -189,21 +190,26 @@ const css = `
 // ─────────────────────────────────────────────
 
 export default function App() {
-const [tab, setTab] = useState(() => {
-  return localStorage.getItem("wordle_last_tab") || "arenas";
-});
+  // Initialize tab state correctly
+  const [tab, setTab] = useState(() => {
+    const saved = localStorage.getItem("wordle_last_tab");
+    // Ensure we only return a valid tab name
+    return (saved === "arenas" || saved === "log" || saved === "history") ? saved : "arenas";
+  });
 
-// 2. Save tab whenever it changes
-useEffect(() => {
-  localStorage.setItem("wordle_last_tab", tab);
-}, [tab]);
-  const [session, setSession]       = useState(null);
-  const [profile, setProfile]       = useState(null); // { id, username }
-  const [myLogs, setMyLogs]         = useState([]);   // rows from `logs` table
-  const [loading, setLoading]       = useState(true);
-  const [arenaView, setArenaView]   = useState("list");
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [myLogs, setMyLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [arenaView, setArenaView] = useState("list");
   const [currentArena, setCurrentArena] = useState(null);
 
+  // Sync tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("wordle_last_tab", tab);
+  }, [tab]);
+
+  // ... rest of your useEffects and functions ...
 
 const handleSignOut = async () => {
   await supabase.auth.signOut();
